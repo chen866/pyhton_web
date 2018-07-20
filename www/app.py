@@ -1,5 +1,6 @@
 import logging
 import asyncio
+
 from aiohttp import web
 
 logging.basicConfig(level=logging.INFO)
@@ -9,6 +10,7 @@ def index(request):
     return web.Response(body=b'<h1>This is the first page!</h1>', content_type='text/html')
 
 
+# Web App骨架
 @asyncio.coroutine
 def init(Loop):
     app = web.Application(loop=Loop)
