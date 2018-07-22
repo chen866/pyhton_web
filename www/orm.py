@@ -14,7 +14,7 @@ def create_pool(Loop, **kwargs):
         user=kwargs['user'],
         password=kwargs['password'],
         db=kwargs['db'],
-        charset=kwargs.get('charset', 'utf-8'),
+        charset=kwargs.get('charset', 'utf8'),
         autocommit=kwargs.get('autocommit', True),
         maxsize=kwargs.get('maxsize', 10),
         loop=Loop
@@ -60,7 +60,7 @@ def create_args_string(num):
     L = []
     for n in range(num):
         L.append('?')
-        return ', '.join(L)
+    return ', '.join(L)
 
 
 def log(sql, args=()):
@@ -139,10 +139,8 @@ class ModelMetaclass(type):
         attrs['__fields__'] = fields  # 除主键以外的其他属性名
         # 构造默认的增删改查
         attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ','.join(escaped_fields), tableName)
-        # attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (
-        # tableName, ','.join(map(lambda f: '`%s` = ?' % (mappings.get(f).name or f), fields)), primaryKey)
-        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (
-            tableName, ', '.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields) + 1))
+        # attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ','.join(map(lambda f: '`%s` = ?' % (mappings.get(f).name or f), fields)), primaryKey)
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ', '.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields) + 1))
         attrs['__update__'] = 'update `%s` set %s where `%s` = ?' % (
             tableName, ','.join(map(lambda f: '`%s` = ?' % (mappings.get(f).name or f), fields)), primaryKey)
         attrs['__delete__'] = 'delete from `%s` where `%s` = ?' % (tableName, primaryKey)
