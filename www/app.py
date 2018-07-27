@@ -1,11 +1,13 @@
+import asyncio
+import json
 import logging
-import asyncio, os, json, time
-from datetime import datetime
+import os
+import time
 
-from aiohttp import web
-from jinja2 import Environment, FileSystemLoader
 import orm
+from aiohttp import web
 from coreweb import add_routers, add_static
+from jinja2 import Environment, FileSystemLoader
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,7 +39,8 @@ async def logger_factory(app, handler):
     async def logger(request):
         logging.info('Request: %s %s' % (request.method, request.path))
         # await asyncio.sleep(0.3)
-        return (await handler(request))
+        return await handler(request)
+
     return parse_data
 
 
@@ -50,7 +53,8 @@ async def data_factory(app, handle):
             elif request.content_type.startswith('application/x-www-form-urlencoded'):
                 request.__data__ = await request.post()
                 logging.info('request from: %s' % str(request.__data__))
-        return (await handler(request))
+        return await handler(request)
+
     return parse_data
 
 
@@ -73,7 +77,8 @@ async def reponse_factory(app, handle):
         elif isinstance(r, dict):
             template = r.get('__template__')
             if template is None:
-                resp = web.Response(body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode('utf-8'))
+                resp = web.Response(
+                    body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode('utf-8'))
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
             else:
@@ -90,6 +95,7 @@ async def reponse_factory(app, handle):
         resp = web.Response(body=str(r).encode('utf-8'))
         resp.content_type = 'text/plain;charset=utf-8'
         return resp
+
     return response
 
 
@@ -104,7 +110,7 @@ def datetime_filter(t):
     elif delta < 604800:
         return u'%s天前' % (delta // 86400)
     dt = datatime.formtimestamp(t)
-    return u'%s年%s月%s日' %s (dt.year, dt.mouth, dt.day)
+    return u'%s年%s月%s日' % (dt.year, dt.mouth, dt.day)
 
 
 async def init(Loop):
@@ -116,6 +122,7 @@ async def init(Loop):
     srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
     logging.info('server started at http://127.0.0.1:9000...')
     return srv
+
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(init(loop))
