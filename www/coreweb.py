@@ -1,5 +1,11 @@
 import functools
-
+import asyncio
+import os
+import logging
+import inspect
+from urllib import parse
+from aiohttp import web
+from apis import APIError
 
 def get(path):
     def decorator(func):
@@ -29,7 +35,7 @@ def post(path):
 
 def get_required_kwargs(fn):
     args = []
-    params = inspect.signature(fn).paeameters
+    params = inspect.signature(fn).parameters
     for name, param in params.items():
         if param.kind == inspect.Parameter.KEYWORD_ONLY and param.default == inspect.Parameter.empty:
             args.append(name)
@@ -38,7 +44,7 @@ def get_required_kwargs(fn):
 
 def get_named_kwargs(fn):
     args = []
-    params = insepect.signature(fn).parameters
+    params = inspect.signature(fn).parameters
     for name, param in params.items():
         if param.kind == inspect.Parameter.KEYWORD_ONLY:
             args.append(name)
@@ -53,7 +59,7 @@ def has_named_kwargs(fn):
 
 
 def has_var_kwargs(fn):
-    params - inspect.signature(fn).parameters
+    params = inspect.signature(fn).parameters
     for name, param in params.items():
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             return True
@@ -65,7 +71,7 @@ def has_request_args(fn):
     found = False
     for name, param in params.items():
         if name == 'request':
-            found = Ture
+            found = True
             continue
         if fonnd and (
                 param.kind != inspect.Parameter.VAR_POSITIONAL and param.kind != inspect.Parameter.KEYWORD_ONLY and param.kind != inspect.Parameter.VAR_KEYWORD):
@@ -122,7 +128,7 @@ class RequestHandler(object):
                 if k in kw:
                     logging.warning('Duplicate arg name in named arg and kw args: %s' % k)
                 kw[k] = v
-        if self._has_request_arg:
+        if self._has_request_args:
             kw['request'] = request
         # check required kw:
         if self._required_kw_args:
@@ -148,8 +154,7 @@ def add_route(app, fn):
     path = getattr(fn, '__route__', None)
     if path is None or method is None:
         raise ValueError('@get or @post not defined in %s.' % str(fn))
-    if not asyncio.iscoroutinefunction(fn) and not inspect:
-        isgeneratorfunction(fn)
+    if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
         fn = asyncio.coroutine(fn)
     logging.info(
         'add route %s %s => %s(%s)' % (method, path, fn.__name__, ','.join(inspect.signature(fn).parameters.keys())))
@@ -157,18 +162,18 @@ def add_route(app, fn):
 
 
 def add_routers(app, module_name):
-    n = Module_name.rfind('.')
+    n = module_name.rfind('.')
     if n == -1:
         mod = __import__(module_name, globals(), locals())
     else:
-        name = module_name[n+1:]
+        name = module_name[n + 1:]
         mod = getattr(__import__(module_name[:n], globals(), locals(), [name]), name)
     for attr in dir(mod):
         if attr.startswith('_'):
             continue
-        fn=getattr(mod, attr)
+        fn = getattr(mod, attr)
         if callable(fn):
-            method = getattr(fn, '__mothod__', None)
+            method = getattr(fn, '__method__', None)
             path = getattr(fn, '__route__', None)
             if method and path:
                 add_route(app, fn)

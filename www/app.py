@@ -25,7 +25,7 @@ def init_jinja2(app, **kwargs):
 
     path = kwargs.get('path', None)
     if path is None:
-        Path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
     logging.info('set jinja2 template path: %s' % path)
     env = Environment(loader=FileSystemLoader(path), **options)
     filters = kwargs.get('filters', None)
@@ -40,8 +40,7 @@ async def logger_factory(app, handler):
         logging.info('Request: %s %s' % (request.method, request.path))
         # await asyncio.sleep(0.3)
         return await handler(request)
-
-    return parse_data
+    return logger
 
 
 async def data_factory(app, handle):
@@ -58,11 +57,11 @@ async def data_factory(app, handle):
     return parse_data
 
 
-async def reponse_factory(app, handle):
+async def response_factory(app, handler):
     async def response(request):
         logging.info('Response handler...')
         r = await handler(request)
-        if isinstance(r, web.StreamPesponse):
+        if isinstance(r, web.StreamResponse):
             return r
         elif isinstance(r, bytes):
             resp = web.Response(body=r)
@@ -86,7 +85,7 @@ async def reponse_factory(app, handle):
                 resp.content_type = 'text/html;chartset=utf-8'
                 return resp
         elif isinstance(r, int) and 100 <= r < 600:
-            return web.Response(t, str(m))
+            return web.Response(r)
         elif isinstance(r, tuple) and len(r) == 2:
             t, m = r
             if isinstance(t, int) and 100 < t < 600:
@@ -95,7 +94,6 @@ async def reponse_factory(app, handle):
         resp = web.Response(body=str(r).encode('utf-8'))
         resp.content_type = 'text/plain;charset=utf-8'
         return resp
-
     return response
 
 
@@ -114,12 +112,12 @@ def datetime_filter(t):
 
 
 async def init(Loop):
-    await orm.create_pool(loop=Loop, host='127.0.0.1', post='3306', user='root', password='root', db='awesome')
-    app = web.Application(loop=Loop, middlewares=[logger_factory, reponse_factory])
-    init_jinja2(app, filters=dict(datatime_filter))
+    await orm.create_pool(Loop=Loop, host='127.0.0.1', post='3306', user='root', password='root', db='awesome2')
+    app = web.Application(loop=Loop, middlewares=[logger_factory, response_factory])
+    init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routers(app, 'handlers')
     add_static(app)
-    srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
+    srv = await Loop.create_server(app.make_handler(), '127.0.0.1', 9000)
     logging.info('server started at http://127.0.0.1:9000...')
     return srv
 

@@ -30,7 +30,7 @@ def select(sql, args, size=None):
     with (yield from __pool) as conn:
         # SQL语句的占位符是?，而MySQL的占位符是%s，select()函数在内部自动替换。
         # 注意要始终坚持使用带参数的SQL，而不是自己拼接SQL字符串，这样可以防止SQL注入攻击。
-        curse = yield from conn.excute(sql.replace('?', '%s'), args or ())
+        curse = yield from conn.execute(sql.replace('?', '%s'), args or ())
         if size:
             result = yield from curse.fetchmany(size)
         else:
@@ -217,8 +217,8 @@ class Model(dict, metaclass=ModelMetaclass):
                     args.extend(limit)
                 else:
                     raise ValueError('Invalid limit value: %s' % str(limit))
-            result = yield from select(' '.join(sql), args)
-            return [cls(**r) for r in result]
+        result = yield from select(' '.join(sql), args)
+        return [cls(**r) for r in result]
 
     @classmethod
     @asyncio.coroutine
