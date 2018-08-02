@@ -7,6 +7,7 @@ from urllib import parse
 from aiohttp import web
 from apis import APIError
 
+
 def get(path):
     def decorator(func):
         @functools.wraps(func)
@@ -16,7 +17,6 @@ def get(path):
         wrapper.__method__ = 'GET'
         wrapper.__route__ = path
         return wrapper
-
     return decorator
 
 
@@ -25,11 +25,9 @@ def post(path):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-
         wrapper.__method__ = 'POST'
         wrapper.__route__ = path
         return wrapper
-
     return decorator
 
 

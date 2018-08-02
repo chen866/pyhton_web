@@ -74,7 +74,7 @@ async def response_factory(app, handler):
             resp.content_type = 'text/hrml;chartset=utf-8'
             return resp
         elif isinstance(r, dict):
-            template = r.get('__template__')
+            template = r.get('__templates__')
             if template is None:
                 resp = web.Response(
                     body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode('utf-8'))
@@ -117,8 +117,8 @@ async def init(Loop):
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routers(app, 'handlers')
     add_static(app)
-    srv = await Loop.create_server(app.make_handler(), '127.0.0.1', 9000)
-    logging.info('server started at http://127.0.0.1:9000...')
+    srv = await Loop.create_server(app.make_handler(), '127.0.0.1', 9001)
+    logging.info('server started at http://127.0.0.1:9001...')
     return srv
 
 

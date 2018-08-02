@@ -4,11 +4,10 @@ import aiomysql
 
 
 # 全局数据库连接池
-@asyncio.coroutine
-def create_pool(Loop, **kwargs):
+async def create_pool(Loop, **kwargs):
     logging.info('create database connection pool...')
     global __pool
-    __pool = yield from aiomysql.create_pool(
+    __pool = await aiomysql.create_pool(
         host=kwargs.get('host', 'localhost'),
         port=kwargs.get('port', 3306),
         user=kwargs['user'],
@@ -23,35 +22,38 @@ def create_pool(Loop, **kwargs):
 
 # 查询通用方法
 # size 获取制定数量的结果
-@asyncio.coroutine
-def select(sql, args, size=None):
+async def select(sql, args, size=None):
     log(sql, args)
     global __pool
-    with (yield from __pool) as conn:
+    async with __pool.get() as conn:
         # SQL语句的占位符是?，而MySQL的占位符是%s，select()函数在内部自动替换。
         # 注意要始终坚持使用带参数的SQL，而不是自己拼接SQL字符串，这样可以防止SQL注入攻击。
-        curse = yield from conn.execute(sql.replace('?', '%s'), args or ())
-        if size:
-            result = yield from curse.fetchmany(size)
-        else:
-            result = yield from curse.fetchall()
-        yield from curse.close()
+        async with conn.cursor(aiomysql.DictCursor) as curse:
+            await curse.execute(sql.replace('?', '%s'), args or ())
+            if size:
+                result = await curse.fetchmany(size)
+            else:
+                result = await curse.fetchall()
         logging.info('rows returned %s' % len(result or ()))
         return result
 
 
 # 通用修改方法
-@asyncio.coroutine
-def execute(sql, args):
+async def execute(sql, args, autocommit=True):
     log(sql, args)
-    with (yield from __pool) as conn:
+    async with __pool as conn:
+        if not autocommit:
+            await conn.begin()
         try:
-            curse = yield from conn.cursor()
-            # SQL语句的占位符是?，而MySQL的占位符是%s，execute()函数在内部自动替换。
-            yield from curse.execute(sql.replace('?', '%s'), args)
-            affected = curse.rowcount
-            yield from curse.close()
+            async with conn.curse(aiomysql.DictCurse) as curse:
+                # SQL语句的占位符是?，而MySQL的占位符是%s，execute()函数在内部自动替换。
+                await curse.execute(sql.replace('?', '%s'), args)
+                affected = curse.rowcount
+            if not autocommit:
+                await conn.commit()
         except BaseException:
+            if not autocommit:
+                await conn.rollback()
             raise
         return affected
 
@@ -176,25 +178,22 @@ class Model(dict, metaclass=ModelMetaclass):
         return value
 
     @classmethod
-    @asyncio.coroutine
-    def find(cls, primaryKey):
+    async def find(cls, primaryKey):
         # find object by primary key
-        result = yield from select('%s where `%s` = ?' % (cls.__select__, cls.__primary_key__), [primaryKey], 1)
+        result = await select('%s where `%s` = ?' % (cls.__select__, cls.__primary_key__), [primaryKey], 1)
         if len(result) == 0:
             return None
         return cls(**result[0])
 
-    @asyncio.coroutine
-    def save(self):
+    async def save(self):
         args = list(map(self.getValueOrDefault, self.__fields__))
         args.append(self.getValueOrDefault(self.__primary_key__))
-        rows = yield from execute(self.__insert__, args)
+        rows = await execute(self.__insert__, args)
         if rows != 1:
             logging.warning('failed to insert record: affected rows: %s' % rows)
 
     @classmethod
-    @asyncio.coroutine
-    def findAll(cls, where=None, args=None, **kwargs):
+    async def findAll(cls, where=None, args=None, **kwargs):
         # find objects by where clause
         sql = [cls.__select__]
         if where:
@@ -217,33 +216,30 @@ class Model(dict, metaclass=ModelMetaclass):
                     args.extend(limit)
                 else:
                     raise ValueError('Invalid limit value: %s' % str(limit))
-        result = yield from select(' '.join(sql), args)
+        result = await select(' '.join(sql), args)
         return [cls(**r) for r in result]
 
     @classmethod
-    @asyncio.coroutine
-    def findNumber(cls, selectField, where=None, args=None):
+    async def findNumber(cls, selectField, where=None, args=None):
         # find number by select and where
         sql = ['select %s _num_ from `%s`' % (selectField, cls.__table__)]
         if where:
             sql.append('where')
             sql.append(where)
-        result = yield from select(' '.join(sql), args, 1)
+        result = await select(' '.join(sql), args, 1)
         if len(result) == 0:
             return None
         return result[0]['_num_']
 
-    @asyncio.coroutine
-    def update(self):
+    async def update(self):
         args = list(map(self.getValue, self.__fields__))
         args.append(self.getValue(self.__primary_key__))
-        rows = yield from execute(self.__update__, args)
+        rows = await execute(self.__update__, args)
         if rows != 1:
             logging.warning('failed to update by primary key: affected rows: %s' % rows)
 
-    @asyncio.coroutine
-    def remove(self):
+    async def remove(self):
         args = [self.getValue(self.__primary_key__)]
-        rows = yield from execute(self.__delete__, args)
+        rows = await execute(self.__delete__, args)
         if rows != 1:
             logging.warning('failed to remove by primary key: affected rows: %s' % rows)
