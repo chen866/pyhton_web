@@ -71,7 +71,7 @@ def has_request_args(fn):
         if name == 'request':
             found = True
             continue
-        if fonnd and (
+        if found and (
                 param.kind != inspect.Parameter.VAR_POSITIONAL and param.kind != inspect.Parameter.KEYWORD_ONLY and param.kind != inspect.Parameter.VAR_KEYWORD):
             raise ValueError(
                 'request parameter must be the last named parameter in function: %s%s' % (fn.__name__, str(sig)))
@@ -84,13 +84,14 @@ class RequestHandler(object):
         self._func = fn
         self._has_request_args = has_request_args(fn)
         self._has_var_kw_args = has_var_kwargs(fn)
+        self._has_named_kw_args = has_named_kwargs(fn)
         self._named_kw_args = get_named_kwargs(fn)
         self._required_kw_args = get_required_kwargs(fn)
 
     @asyncio.coroutine
     def __call__(self, request):
         kw = None
-        if self._has_var_kw_args or self._has_var_kw_args or self._required_kw_args:
+        if self._has_var_kw_args or self._has_named_kw_args or self._required_kw_args:
             if request.method == 'POST':
                 if not request.content_type:
                     return web.HTTPBadRequest('Missing Content-Type.')
@@ -114,7 +115,7 @@ class RequestHandler(object):
         if kw is None:
             kw = dict(**request.match_info)
         else:
-            if not self._has_var_kw_arg and self._named_kw.args:
+            if not self._has_var_kw_args and self._named_kw_args:
                 # remove all unamed kw:
                 copy = dict()
                 for name in self._named_kw_args:
@@ -132,7 +133,7 @@ class RequestHandler(object):
         if self._required_kw_args:
             for name in self._required_kw_args:
                 if not name in kw:
-                    return web.HTTPBadRequest('Missing argument: %s' % name)
+                    return web.HTTPBadRequest(('Missing argument: %s' % name))
         logging.info('call with args: %s' % str(kw))
         try:
             r = yield from self._func(**kw)
