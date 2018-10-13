@@ -218,6 +218,7 @@ function Template(tpl) {
 // extends jQuery.form:
 
 $(function () {
+    console.log('Extends $form...');
     $.fn.extend({
         showFormError: function (err) {
             return this.each(function () {
